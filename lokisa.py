@@ -3,89 +3,27 @@ import os
 import glob
 import textgrid
 import Levenshtein
+import logging
+import datetime
 from tqdm import tqdm
 from pprint import pprint
 
 import colorama
 colorama.init()
 
+def log_and_print(message):
+    print(message)
+    logging.info(message)
 
-def find_matches_faster2(inword, wordlist, num_alternatives=5, ratios_out=None, force_alternatives=False):
+def find_matches_faster(inword, wordlist, num_alternatives=5, ratios_out=None, force_alternatives=False):
+    """
+    Use Levenshtein to find match word with closely matching spellings.
+    """
 
     match_ratios = sorted([(awd, round(Levenshtein.ratio(inword, awd), 3)) for awd in wordlist], reverse=True, key=lambda xx: xx[1])
 
     # Discard the first match which is the query word itself.
     return match_ratios[1:num_alternatives+1]
-
-
-def find_matches_faster(inword, wordlist, num_alternatives=5, ratios_out=None, force_alternatives=False):
-    '''
-    A faster implementation of find_matches() using the Levenshtein C package.
-    The returned data type is a list with first item the input word, and
-    subsequent items a list of alternative words, if the input word did not occur in the word list (dictionary).
-    NB!! Be sure to have wordlist as a set data type for optimal speed -- list data type is slow.
-    '''
-    
-    matches = [inword]
-
-    if inword in wordlist and not force_alternatives:
-        return matches
-    
-    ratios = list()
-    for aword in wordlist:
-        aratio = Levenshtein.ratio(inword, aword)
-        if aratio == 1.0 and not force_alternatives:
-            return matches
-        ratios.append( (aword, aratio) )
-    
-    # Sort by element 2 of the tuple, which is the ratio value
-    ratios_sorted = sorted(ratios, key=lambda ratio: ratio[1], reverse=True)
-    
-    # slice out the top scoring num_alternative items from the list
-    if ratios_sorted[1][1] != 1.0:
-        #matches.extend([alt[0] for alt in ratios_sorted[-1:-num_alternatives-1:-1]])
-        matches.extend([alt[0] for alt in ratios_sorted[0:num_alternatives]])
-        if ratios_out != None:
-
-#            winratio = ratios_sorted[0][1]
-#            for awd,arat in ratios_sorted:
-#                if arat == winratio:
-#                    ratios_out.append(awd)
-#                else:
-#                    break
-
-            winratio = ratios_sorted[0][1]
-            ratios_out[winratio] = set([])
-            for awd,arat in ratios_sorted:
-                if arat == winratio:
-                    ratios_out[winratio].add(awd)
-                else:
-                    break
-        
-    return matches
-
-def find_matches(inword, wordlist, num_alternatives=5):
-    '''
-    Returns a list of closest matching words.
-    The returned data type is a list with first item the input word, and
-    subsequent items a list of alternative words, if the input word did not occur in the word list (dictionary).
-    '''
-    
-    matches = difflib.get_close_matches(inword, wordlist, num_alternatives)
-    if matches: # check if list is not empty
-        matches = [x.strip() for x in matches]
-        if matches[0] == inword: # exact match
-            matches = [inword]
-        elif len(matches) < 5:
-            matches.extend([NO_ALTERNATIVE for x in range(0, num_alternatives - len(matches))])
-            matches.insert(0, inword)
-        else:
-            matches.insert(0, inword)
-    else:
-        matches = [inword]
-        matches.extend([NO_ALTERNATIVE for x in range(0, num_alternatives)])
-        
-    return matches
 
 
 def get_textgrid_text(atgfn):
@@ -169,13 +107,12 @@ def get_prioritised_list(tokenlist, get_topN=100):
     """
     Build a prioritised list of word types that should be considered for
     checking. The top N (default N=100) word types are returned.
-
     """
 
-    print("Calculating occurrence counts.")
+    log_and_print("Calculating occurrence counts.")
     counts_dict = get_token_counts(tokenlist, list(set(tokenlist)), greater_than=0)
     tokenlist = [awd for awd in tokenlist if awd in counts_dict]
-    print("Calculating word lengths.")
+    log_and_print("Calculating word lengths.")
     len_dict = get_word_lengths(list(set(tokenlist)), greater_than=4)
     typeslist = list(len_dict.keys())
     tokenlist = [awd for awd in tokenlist if awd in len_dict]
@@ -185,6 +122,7 @@ def get_prioritised_list(tokenlist, get_topN=100):
         combined_list = combined_list[0:get_topN]
 
     return combined_list, tokenlist, typeslist
+
 
 def set_coloured_word(astr, awrd, colorama_colour, instance=0):
     icount = 0
@@ -201,14 +139,6 @@ def set_coloured_word(astr, awrd, colorama_colour, instance=0):
 
     return " ".join(newstr)
 
-def input_parser(input_text, current_state):
-    # 
-    return answer
-
-PROG_STATES = {
-        "current_state": "next_state",
-        "landing": ""
-        }
 
 def print_main_prompt(prioritised_list):
     """
@@ -223,6 +153,7 @@ def print_main_prompt(prioritised_list):
     print(astr)
     response = input("Enter your choice: ")
     return response
+
 
 def handle_digits(invalue, limhi, limlo=0, action_fc=None):
     """
@@ -250,18 +181,19 @@ def handle_digits(invalue, limhi, limlo=0, action_fc=None):
 
     return retcode
 
+
 def handle_wordtype(awd, typeslist):
     """
     """
 
-    matches = find_matches_faster2(awd, typeslist, num_alternatives=15, force_alternatives=True)
+    matches = find_matches_faster(awd, typeslist, num_alternatives=15, force_alternatives=True)
 
     atgfn_list = glob.glob(os.path.join(tgdir, "**/*.TextGrid"), recursive=True)
     atgfn_list.sort()
 
     # First draw up a list of all the occurrences in all the textgrids so that we can
     # traverse them if required
-    print("Building the worklist.")
+    log_and_print("Building the worklist.")
     worklist = []
     occ_cnt = 0
     for atgfn in tqdm(atgfn_list):
@@ -337,7 +269,7 @@ def handle_wordtype(awd, typeslist):
             worklist_idx += 1
             continue
         elif response == "q":
-            print("Quiting for \"{}\"".format(awd))
+            log_and_print("Quiting for \"{}\"".format(awd))
             break
         else:
             print("\"{}\" is not a valid choice. Please try again.".format(response))
@@ -347,13 +279,27 @@ def handle_wordtype(awd, typeslist):
 
 if __name__ == "__main__":
 
+    # Log everything that happens during the session in a log file.
+    logdir = "log"
+    os.makedirs(logdir, exist_ok=True)
+    dtnow = datetime.datetime.now()
+    datestr = dtnow.strftime("%y%m%d_%H%M%S")
+
+    logging.basicConfig(**{
+        "filename": os.path.join(logdir, "logfile_{}.txt".format(datestr)),
+        "level": logging.INFO,
+        "format": "%(levelname)s:%(name)s:%(asctime)s:%(message)s"
+        })
+    logging.info("Starting Lokisa Spell.")
+
+
     tgdir = "workingdir/textgrids"
 
-    print("Finding and parsing all TextGrid files in {}".format(tgdir))
+    log_and_print("Finding and parsing all TextGrid files in {}".format(tgdir))
     text_all = get_textgrid_text_all(tgdir)
     #text_all.sort()
 
-    print("Extracting all word tokens.")
+    log_and_print("Extracting all word tokens.")
     tokenlist = split_list(text_all)
     #tokenlist.sort()
 
@@ -362,7 +308,7 @@ if __name__ == "__main__":
     #len_list = get_word_lengths(list(set(tokenlist)), greater_than=4)
 
     #combined_list = sorted([(acnt, awd, counts_dict[awd], acnt + counts_dict[awd]) for acnt, awd in len_list], key=lambda xx: xx[3], reverse=True)
-    print("Prioritising word types.")
+    log_and_print("Prioritising word types.")
     prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist)
 
 
@@ -383,10 +329,10 @@ if __name__ == "__main__":
                 continue
             else:
                 awd = prioritised_list[int(response)][1]
-                print("Let's work on \"{}\"".format(awd))
+                log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
                 handle_wordtype(awd,  typeslist)
-                print("Going back to the main menu.")
+                log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
         elif response == "q":
