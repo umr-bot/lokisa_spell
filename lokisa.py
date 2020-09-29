@@ -1,3 +1,15 @@
+"""
+Lokisa Spell
+
+This simple progam tries to identify spellings in TextGrid transcriptions
+that are closely match and may thus be either spelling mistakes or spelling
+variations of a word.
+"""
+
+__author__ = "Ewald van der Westhuizen"
+__affiliation__ = "Stellenbosch University"
+__date__ = "2020-09-29"
+
 import sys
 import os
 import glob
@@ -10,6 +22,7 @@ from pprint import pprint
 
 import colorama
 colorama.init()
+
 
 def log_and_print(message):
     print(message)
