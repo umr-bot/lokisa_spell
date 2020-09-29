@@ -95,6 +95,10 @@ def get_textgrid_text(atgfn):
 
 
 def get_textgrid_text_all(atgdir):
+    """
+    Find all the TextGrid files in the given directory and read in all the
+    annotations. Return the annotations as a list of text string.
+    """
     atgfn_list = glob.glob(os.path.join(atgdir, "**/*.TextGrid"), recursive=True)
     atgfn_list.sort()
 
@@ -116,6 +120,8 @@ def split_list(
     """
     Split each list item (assumed to be a line of text) into
     words and flatten to not have line or sentence boundaries.
+    Also performs some cleanup for the given 'remove_' options.
+    Returns a list of all the word tokens.
     """
     removes = []
     if remove_fra:
@@ -142,19 +148,34 @@ def split_list(
     return tokenlist
 
 def get_token_counts(tokenlist, typeslist, greater_than=0):
+    """
+    Calculate the occurrence counts of each word type given the full list of word tokens.
+    The counts are return as a dictionary where the key is the word type and the value is the count.
+    """
     return {awty: tokenlist.count(awty) for awty in tqdm(typeslist) if tokenlist.count(awty) > greater_than}
 
 
 def get_word_lengths(awlist, greater_than=0):
+    """
+    Calculate the length of each word in the given word list and return the result
+    as a dictionary, where the key is the word type and the value is the length.
+    """
     len_dict = {awd: len(awd) for awd in tqdm(awlist) if len(awd) > greater_than}
 
     return len_dict
 
 
-def get_proiritised_list(tokenlist, get_topN=100):
+def get_prioritised_list(tokenlist, get_topN=100):
+    """
+    Build a prioritised list of word types that should be considered for
+    checking. The top N (default N=100) word types are returned.
 
+    """
+
+    print("Calculating occurrence counts.")
     counts_dict = get_token_counts(tokenlist, list(set(tokenlist)), greater_than=0)
     tokenlist = [awd for awd in tokenlist if awd in counts_dict]
+    print("Calculating word lengths.")
     len_dict = get_word_lengths(list(set(tokenlist)), greater_than=4)
     typeslist = list(len_dict.keys())
     tokenlist = [awd for awd in tokenlist if awd in len_dict]
@@ -189,14 +210,150 @@ PROG_STATES = {
         "landing": ""
         }
 
+def print_main_prompt(prioritised_list):
+    """
+    Print the main menu and wait for a response.
+    Return the value of the response.
+    """
+
+    astr = "Which word do you wish to work on?\n"
+    for tcount, atup in enumerate(prioritised_list):
+        astr += "{:>4}: {}\n".format(tcount, atup[1])
+    astr += "{:>4}: {}\n".format("q", "To quit the program.")
+    print(astr)
+    response = input("Enter your choice: ")
+    return response
+
+def handle_digits(invalue, limhi, limlo=0, action_fc=None):
+    """
+    Parse a numerical response by the user and call an
+    action function if it is provided.
+    Returns True if not parsing error occurred.
+    Returns False if a parsing error occurred.
+    """
+    retcode = False
+    try:
+        if int(invalue) >= limlo and int(invalue) < limhi:
+            retcode = True
+            # A valid number was selected.
+            print("You chose {}.".format(invalue))
+            # Perform the replacement and log the change.
+            if action_fc is not None:
+                action_fc(invalue)
+        else:
+            # Not a valid number. Retry.
+            print("\"{}\" is not a valid choice. Please try again.".format(invalue))
+            retcode = False
+    except ValueError:
+        print("\"{}\" is not a valid choice. Please try again.".format(invalue))
+        retcode = False
+
+    return retcode
+
+def handle_wordtype(awd, typeslist):
+    """
+    """
+
+    matches = find_matches_faster2(awd, typeslist, num_alternatives=15, force_alternatives=True)
+
+    atgfn_list = glob.glob(os.path.join(tgdir, "**/*.TextGrid"), recursive=True)
+    atgfn_list.sort()
+
+    # First draw up a list of all the occurrences in all the textgrids so that we can
+    # traverse them if required
+    print("Building the worklist.")
+    worklist = []
+    occ_cnt = 0
+    for atgfn in tqdm(atgfn_list):
+        tg = textgrid.TextGrid.fromFile(atgfn)
+        #for interval in tg[0]:
+        for icnt in range(len(tg[0])):
+            interval =  tg[0][icnt]
+            tg_words = interval.mark.strip().split()
+            for icount in range(tg_words.count(awd)):
+                worklist.append((occ_cnt, atgfn, icnt, icount))
+                occ_cnt += 1
+    #pprint(worklist)
+    num_occs = len(worklist)
+
+    #for occ_progress_count, atgfn, interval_count, instance_count in worklist:
+    worklist_idx = 0
+    while True:
+        # Unpack the items in the worklist
+        occ_progress_count, atgfn, interval_count, instance_count = worklist[worklist_idx]
+
+        tg = textgrid.TextGrid.fromFile(atgfn)
+        interval =  tg[0][interval_count]
+        tg_words = interval.mark.strip().split()
+        print("=========================================================================================================")
+        print("Item {} of {}\n".format(occ_progress_count, num_occs))
+        print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
+        print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
+        pstr = "Change it to:\n"
+        for mcnt, amatch in enumerate(matches):
+            pstr += "{:>5}: {:20}\n".format(mcnt, amatch[0])
+        pstr += "{:>5}: {:20}\n".format("e", "Or enter a new word that is not in the list above.")
+        pstr += "{:>5}: {:20}\n".format("l", "Or mark this item to be addressed at a later time.")
+        pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
+        pstr += "{:>5}: {:20}\n".format("q", "Or quit.")
+        pstr += "{:>5}: {:20}\n".format("", "Pressing Enter without a choice will advance to the next item.")
+        print(pstr)
+        response = input("Please enter your choice: ")
+
+        if response.isdigit():
+            # A replacement word was selected.
+            try:
+                if int(response) >= 0 and int(response) < len(matches):
+                    # A valid number was selected.
+                    print("{} was selected.".format(response))
+                    # Perform the replacement and log the change.
+                else:
+                    # Not a valid number. Retry.
+                    print("\"{}\" is not a valid choice. Please try again.".format(response))
+                    continue
+            except ValueError:
+                print("\"{}\" is not a valid choice. Please try again.".format(response))
+                continue
+
+            # Move on to the next item in the worklist.
+            worklist_idx += 1
+            continue
+
+        elif response == "":
+            # Move on to the next item in the worklist without any edits.
+            worklist_idx += 1
+        elif response == "e":
+            # Enter a new word as the correct replacement and add it to the matches list.
+            response = input("Enter the new word and press Enter: ")
+            matches.append((response, 0.0))
+            worklist_idx += 1
+        elif response == "b":
+            # Step back by decrementing the worklist index
+            if worklist_idx > 0:
+                worklist_idx -= 1
+        elif response == "l":
+            # Mark for later -- log it and move on.
+            # Move on to the next item in the worklist.
+            worklist_idx += 1
+            continue
+        elif response == "q":
+            print("Quiting for \"{}\"".format(awd))
+            break
+        else:
+            print("\"{}\" is not a valid choice. Please try again.".format(response))
+            continue
+
+
 
 if __name__ == "__main__":
 
     tgdir = "workingdir/textgrids"
 
+    print("Finding and parsing all TextGrid files in {}".format(tgdir))
     text_all = get_textgrid_text_all(tgdir)
     #text_all.sort()
 
+    print("Extracting all word tokens.")
     tokenlist = split_list(text_all)
     #tokenlist.sort()
 
@@ -205,119 +362,33 @@ if __name__ == "__main__":
     #len_list = get_word_lengths(list(set(tokenlist)), greater_than=4)
 
     #combined_list = sorted([(acnt, awd, counts_dict[awd], acnt + counts_dict[awd]) for acnt, awd in len_list], key=lambda xx: xx[3], reverse=True)
-    proiritised_list, tokenlist, typeslist = get_proiritised_list(tokenlist)
+    print("Prioritising word types.")
+    prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist)
+
 
     #pprint(text_all)
     #pprint(tokenlist)
     #pprint(counts_dict)
     #pprint(len_list)
-    #pprint(proiritised_list)
+    #pprint(prioritised_list)
 
-    for type_count, atup in enumerate(proiritised_list):
-        print(atup)
-        awd = atup[1]
-        #occ_progress_count = 1
-        matches = find_matches_faster2(awd, typeslist, num_alternatives=15, force_alternatives=True)
-        #pprint(matches)
-        for mcnt, amatch in enumerate(matches):
-            print("{},{},{}".format(mcnt, amatch[0], amatch[1]))
-        print(",")
-        response = input("Edit " + awd + " ? [y/n]: ")
-        if response == "y":
-            atgfn_list = glob.glob(os.path.join(tgdir, "**/*.TextGrid"), recursive=True)
-            atgfn_list.sort()
+    while True:
+        
+        response = print_main_prompt(prioritised_list)
 
-            # First draw up a list of all the occurrences in all the textgrids so that we can
-            # traverse them if required
-            print("Building the worklist.")
-            worklist = []
-            occ_cnt = 0
-            for atgfn in tqdm(atgfn_list):
-                tg = textgrid.TextGrid.fromFile(atgfn)
-                #for interval in tg[0]:
-                for icnt in range(len(tg[0])):
-                    interval =  tg[0][icnt]
-                    tg_words = interval.mark.strip().split()
-                    for icount in range(tg_words.count(awd)):
-                        worklist.append((occ_cnt, atgfn, icnt, icount))
-                        occ_cnt += 1
-            #pprint(worklist)
-            num_occs = len(worklist)
+        if response.isdigit():
+            retcode = handle_digits(response, len(prioritised_list))
+            if retcode is False:
+                input("Press Enter to continue.")
+                continue
+            else:
+                awd = prioritised_list[int(response)][1]
+                print("Let's work on \"{}\"".format(awd))
+                input("Press Enter to continue.")
+                handle_wordtype(awd,  typeslist)
+                print("Going back to the main menu.")
+                input("Press Enter to continue.")
 
-            #for occ_progress_count, atgfn, interval_count, instance_count in worklist:
-            worklist_idx = 0
-            while True:
-                # Unpack the items in the worklist
-                occ_progress_count, atgfn, interval_count, instance_count = worklist[worklist_idx]
-
-                tg = textgrid.TextGrid.fromFile(atgfn)
-                interval =  tg[0][interval_count]
-                tg_words = interval.mark.strip().split()
-                print("")
-                print("Item {} of {}\n".format(occ_progress_count, num_occs))
-                print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
-                print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
-                pstr = "Change it to:\n"
-                for mcnt, amatch in enumerate(matches):
-                    pstr += "{:>5}: {:20}\n".format(mcnt, amatch[0])
-                pstr += "{:>5}: {:20}\n".format("e", "Or enter a new word that is not in the list above.")
-                pstr += "{:>5}: {:20}\n".format("l", "Or mark this item to be addressed at a later time.")
-                pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
-                pstr += "{:>5}: {:20}\n".format("q", "Or quit.")
-                pstr += "{:>5}: {:20}\n".format("", "Pressing Enter without a choice will advance to the next item.")
-                print(pstr)
-                response = input("Please enter your choice: ")
-
-                if response.isdigit():
-                    # A replacement word was selected.
-                    try:
-                        if int(response) >= 0 and int(response) < len(matches):
-                            # A valid number was selected.
-                            print("{} was selected.".format(response))
-                            # Perform the replacement and log the change.
-                        else:
-                            # Not a valid number. Retry.
-                            print("\"{}\" is not a valid choice. Please try again.".format(response))
-                            continue
-                    except ValueError:
-                        print("\"{}\" is not a valid choice. Please try again.".format(response))
-                        continue
-
-                    # Move on to the next item in the worklist.
-                    worklist_idx += 1
-                    continue
-
-                elif response == "":
-                    # Move on to the next item in the worklist without any edits.
-                    worklist_idx += 1
-                elif response == "e":
-                    # Enter a new word as the correct replacement and add it to the matches list.
-                    response = input("Enter the new word and press Enter: ")
-                    matches.append((response, 0.0))
-                    worklist_idx += 1
-                elif response == "b":
-                    # Step back by decrementing the worklist index
-                    if worklist_idx > 0:
-                        worklist_idx -= 1
-                elif response == "l":
-                    # Mark for later -- log it and move on.
-                    # Move on to the next item in the worklist.
-                    worklist_idx += 1
-                    continue
-                elif response == "q":
-                    print("Exiting.")
-                    sys.exit(0)
-                else:
-                    print("\"{}\" is not a valid choice. Please try again.".format(response))
-                    continue
-
-
-        else:
-            continue
-
-
-
-
-
-    sys.exit(0)
+        elif response == "q":
+            break
 
