@@ -210,7 +210,7 @@ def handle_wordtype(awd, typeslist):
 
     #for occ_progress_count, atgfn, interval_count, instance_count in worklist:
     worklist_idx = 0
-    while True:
+    while worklist_idx < len(worklist):
         # Unpack the items in the worklist
         occ_progress_count, atgfn, interval_count, instance_count = worklist[worklist_idx]
 
@@ -218,7 +218,7 @@ def handle_wordtype(awd, typeslist):
         interval =  tg[0][interval_count]
         tg_words = interval.mark.strip().split()
         print("=========================================================================================================")
-        print("Item {} of {}\n".format(occ_progress_count, num_occs))
+        print("Item {} of {}\n".format(occ_progress_count+1, num_occs))
         print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
         print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
         pstr = "Change it to:\n"
@@ -238,7 +238,14 @@ def handle_wordtype(awd, typeslist):
                 if int(response) >= 0 and int(response) < len(matches):
                     # A valid number was selected.
                     print("{} was selected.".format(response))
-                    # Perform the replacement and log the change.
+                    # Log the change.
+                    log_and_print("Change {} in file {} interval {} instance {} to {}".format(
+                        awd,
+                        worklist[worklist_idx][1],
+                        worklist[worklist_idx][2]+1,
+                        worklist[worklist_idx][3]+1,
+                        matches[int(response)][0]))
+
                 else:
                     # Not a valid number. Retry.
                     print("\"{}\" is not a valid choice. Please try again.".format(response))
@@ -257,6 +264,12 @@ def handle_wordtype(awd, typeslist):
         elif response == "e":
             # Enter a new word as the correct replacement and add it to the matches list.
             response = input("Enter the new word and press Enter: ")
+            log_and_print("Change {} in file {} interval {} instance {} to {}".format(
+                awd,
+                worklist[worklist_idx][1],
+                worklist[worklist_idx][2]+1,
+                worklist[worklist_idx][3]+1,
+                response))
             matches.append((response, 0.0))
             worklist_idx += 1
         elif response == "b":
