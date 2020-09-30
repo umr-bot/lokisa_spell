@@ -1,6 +1,6 @@
 # Lokisa spell -- A simple tool to help standardise the orthography of transcribed text data sets
 
-This is still only a working demo and will still regularly in the coming day or weeks. 
+This is still only a working demo and will change regularly in the coming day or weeks. 
 
 
 ## Requirements
