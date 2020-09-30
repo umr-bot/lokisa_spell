@@ -8,6 +8,7 @@ This is still only a working demo and will change regularly in the coming day or
 The program has been developed and tested with Python version 3.7.8.
 
 Python packages that are required to be installed are:
+
 * python-levenshtein
 * colorama
 * tqdm
@@ -22,7 +23,7 @@ a python environment in the Lokisa project's root directory. Activate this envir
 
     conda activate <path_to_the_conda_environment>
 
-If the environment loaded successfully, you can now start the program (see [usage](#usage)) .
+If the environment loaded successfully, you can now start the program (see the [Usage](#Usage) section) .
 
 
 ## Windows and Mac
