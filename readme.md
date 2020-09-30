@@ -19,9 +19,9 @@ Python packages that are required to be installed are:
 
 If you use `conda` to manage your Python environments in Linux, you can just run the `setup.sh` bash
 script to perform the setup of the required Python environment and packages. This setup script creates
-a python environment in the Lokisa project's root directory. Activate this environment by executing:
+a python environment in the Lokisa project's root directory under `conda_env`. Activate this environment by executing:
 
-    conda activate <path_to_the_conda_environment>
+    conda activate <path_to_lokisas_project_root>/conda_env
 
 If the environment loaded successfully, you can now start the program (see the [Usage](#Usage) section) .
 
