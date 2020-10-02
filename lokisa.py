@@ -28,15 +28,26 @@ def log_and_print(message):
     print(message)
     logging.info(message)
 
-def find_matches_faster(inword, wordlist, num_alternatives=5, ratios_out=None, force_alternatives=False):
+def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold=0.0):
     """
     Use Levenshtein to find match word with closely matching spellings.
+    Returns a list with tuples (word_label, Levenshtein_ratio)
     """
 
-    match_ratios = sorted([(awd, round(Levenshtein.ratio(inword, awd), 3)) for awd in wordlist], reverse=True, key=lambda xx: xx[1])
+    match_ratios = [(awd, Levenshtein.ratio(inword, awd)) for awd in wordlist]
 
-    # Discard the first match which is the query word itself.
-    return match_ratios[1:num_alternatives+1]
+    if ratio_threshold > 0.0:
+        match_ratios = [(awd, levrat) for awd, levrat in match_ratios if levrat > ratio_threshold]
+
+    match_ratios = sorted([(awd, round(levrat, 3)) for awd, levrat in match_ratios if levrat > ratio_threshold], reverse=True, key=lambda xx: xx[1])
+
+    if num_alternatives is not None:
+        # Discard the first match which is the query word itself.
+        match_ratios = match_ratios[1:num_alternatives+1]
+    else:
+        match_ratios = match_ratios[1:]
+
+    return match_ratios
 
 
 def get_textgrid_text(atgfn):
@@ -120,6 +131,8 @@ def get_prioritised_list(tokenlist, get_topN=100):
     """
     Build a prioritised list of word types that should be considered for
     checking. The top N (default N=100) word types are returned.
+    The returned tuples are:
+    (word_length, word_label, frequency_count, priority_score)
     """
 
     log_and_print("Calculating occurrence counts.")
@@ -153,15 +166,18 @@ def set_coloured_word(astr, awrd, colorama_colour, instance=0):
     return " ".join(newstr)
 
 
-def print_main_prompt(prioritised_list):
+def print_main_prompt(prioritised_list, start_idx=0, end_idx=10):
     """
     Print the main menu and wait for a response.
     Return the value of the response.
     """
 
-    astr = "Which word do you wish to work on?\n"
+    astr = "\nWhich word do you wish to work on?\n"
     for tcount, atup in enumerate(prioritised_list):
-        astr += "{:>4}: {}\n".format(tcount, atup[1])
+        if tcount >= start_idx and tcount < end_idx:
+            astr += "{:>4}: {:20} [freq: {:5}; pscore: {:5}]\n".format(tcount, atup[1], atup[2], atup[3])
+    astr += "{:>4}: {}\n".format("n", "Next 10 words.")
+    astr += "{:>4}: {}\n".format("b", "Previous 10 words.")
     astr += "{:>4}: {}\n".format("q", "To quit the program.")
     print(astr)
     response = input("Enter your choice: ")
@@ -195,11 +211,11 @@ def handle_digits(invalue, limhi, limlo=0, action_fc=None):
     return retcode
 
 
-def handle_wordtype(awd, typeslist):
+def handle_wordtype(awd, typeslist, num_alternatives=None, ratio_threshold=0.0):
     """
     """
 
-    matches = find_matches_faster(awd, typeslist, num_alternatives=15, force_alternatives=True)
+    matches = find_matches_faster(awd, typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
 
     atgfn_list = glob.glob(os.path.join(tgdir, "**/*.TextGrid"), recursive=True)
     atgfn_list.sort()
@@ -230,13 +246,13 @@ def handle_wordtype(awd, typeslist):
         tg = textgrid.TextGrid.fromFile(atgfn)
         interval =  tg[0][interval_count]
         tg_words = interval.mark.strip().split()
-        print("=========================================================================================================")
+        print("\n=========================================================================================================\n")
         print("Item {} of {}\n".format(occ_progress_count+1, num_occs))
         print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
         print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
         pstr = "Change it to:\n"
         for mcnt, amatch in enumerate(matches):
-            pstr += "{:>5}: {:20}\n".format(mcnt, amatch[0])
+            pstr += "{:>5}: {:20} [match ratio: {}]\n".format(mcnt, amatch[0], amatch[1])
         pstr += "{:>5}: {:20}\n".format("e", "Or enter a new word that is not in the list above.")
         pstr += "{:>5}: {:20}\n".format("l", "Or mark this item to be addressed at a later time.")
         pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
@@ -305,6 +321,9 @@ def handle_wordtype(awd, typeslist):
 
 if __name__ == "__main__":
 
+    ratio_threshold = 0.7
+    num_alternatives = None
+
     # Log everything that happens during the session in a log file.
     logdir = "log"
     os.makedirs(logdir, exist_ok=True)
@@ -344,9 +363,11 @@ if __name__ == "__main__":
     #pprint(len_list)
     #pprint(prioritised_list)
 
+    mainmenu_start_idx = 0
+    mainmenu_list_length = 10
     while True:
         
-        response = print_main_prompt(prioritised_list)
+        response = print_main_prompt(prioritised_list, start_idx=mainmenu_start_idx, end_idx=mainmenu_start_idx+mainmenu_list_length)
 
         if response.isdigit():
             retcode = handle_digits(response, len(prioritised_list))
@@ -357,10 +378,18 @@ if __name__ == "__main__":
                 awd = prioritised_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd,  typeslist)
+                handle_wordtype(awd,  typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
         elif response == "q":
             break
+
+        elif response == "n":
+            if (mainmenu_start_idx + mainmenu_list_length) < len(prioritised_list):
+                mainmenu_start_idx += mainmenu_list_length
+
+        elif response == "b":
+            if (mainmenu_start_idx - mainmenu_list_length) >= 0:
+                mainmenu_start_idx -= mainmenu_list_length
 
