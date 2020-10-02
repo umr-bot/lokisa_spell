@@ -175,7 +175,7 @@ def print_main_prompt(prioritised_list, start_idx=0, end_idx=10):
     astr = "\nWhich word do you wish to work on?\n"
     for tcount, atup in enumerate(prioritised_list):
         if tcount >= start_idx and tcount < end_idx:
-            astr += "{:>4}: {:20} [freq: {:5}; pscore: {:5}]\n".format(tcount, atup[1], atup[2], atup[3])
+            astr += "{:>4}: {:20} [Occurence count:{:5};  pscore:{:5}]\n".format(tcount, atup[1], atup[2], atup[3])
     astr += "{:>4}: {}\n".format("n", "Next 10 words.")
     astr += "{:>4}: {}\n".format("b", "Previous 10 words.")
     astr += "{:>4}: {}\n".format("q", "To quit the program.")
@@ -211,7 +211,7 @@ def handle_digits(invalue, limhi, limlo=0, action_fc=None):
     return retcode
 
 
-def handle_wordtype(awd, typeslist, num_alternatives=None, ratio_threshold=0.0):
+def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshold=0.0):
     """
     """
 
@@ -247,7 +247,7 @@ def handle_wordtype(awd, typeslist, num_alternatives=None, ratio_threshold=0.0):
         interval =  tg[0][interval_count]
         tg_words = interval.mark.strip().split()
         print("\n=========================================================================================================\n")
-        print("Item {} of {}\n".format(occ_progress_count+1, num_occs))
+        print("Occurence number {} of {}\n".format(occ_progress_count+1, num_occs))
         print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
         print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
         pstr = "Change it to:\n"
@@ -319,7 +319,7 @@ def handle_wordtype(awd, typeslist, num_alternatives=None, ratio_threshold=0.0):
 
 
 
-if __name__ == "__main__":
+def main():
 
     ratio_threshold = 0.7
     num_alternatives = None
@@ -378,7 +378,7 @@ if __name__ == "__main__":
                 awd = prioritised_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd,  typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
+                handle_wordtype(awd, tgdir,  typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
@@ -393,3 +393,5 @@ if __name__ == "__main__":
             if (mainmenu_start_idx - mainmenu_list_length) >= 0:
                 mainmenu_start_idx -= mainmenu_list_length
 
+if __name__ == "__main__":
+    main()
