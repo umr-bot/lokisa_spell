@@ -394,4 +394,8 @@ def main():
                 mainmenu_start_idx -= mainmenu_list_length
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("")
+
