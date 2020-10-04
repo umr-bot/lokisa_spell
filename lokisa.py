@@ -43,7 +43,10 @@ def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold
 
     if num_alternatives is not None:
         # Discard the first match which is the query word itself.
-        match_ratios = match_ratios[1:num_alternatives+1]
+        if len(match_ratios) > num_alternatives:
+            match_ratios = match_ratios[1:num_alternatives+1]
+        else:
+            match_ratios = match_ratios[1:]
     else:
         match_ratios = match_ratios[1:]
 
@@ -172,7 +175,9 @@ def print_main_prompt(prioritised_list, start_idx=0, end_idx=10):
     Return the value of the response.
     """
 
-    astr = "\nWhich word do you wish to work on?\n"
+    print("\n=========================================================================================================")
+    print("=========================================================================================================\n")
+    astr = "Which word do you wish to work on?\n"
     for tcount, atup in enumerate(prioritised_list):
         if tcount >= start_idx and tcount < end_idx:
             astr += "{:>4}: {:20} [Occurence count:{:5};  pscore:{:5}]\n".format(tcount, atup[1], atup[2], atup[3])
@@ -246,7 +251,8 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
         tg = textgrid.TextGrid.fromFile(atgfn)
         interval =  tg[0][interval_count]
         tg_words = interval.mark.strip().split()
-        print("\n=========================================================================================================\n")
+        print("\n=========================================================================================================")
+        print("=========================================================================================================\n")
         print("Occurence number {} of {}\n".format(occ_progress_count+1, num_occs))
         print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
         print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
@@ -257,7 +263,7 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
         pstr += "{:>5}: {:20}\n".format("l", "Or mark this item to be addressed at a later time.")
         pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
         pstr += "{:>5}: {:20}\n".format("q", "Or quit.")
-        pstr += "{:>5}: {:20}\n".format("", "Pressing Enter without a choice will advance to the next item.")
+        pstr += "{:>5}: {:20}\n".format("", "Pressing Enter without a choice will advance to the next occurrence.")
         print(pstr)
         response = input("Please enter your choice: ")
 
@@ -308,6 +314,11 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
         elif response == "l":
             # Mark for later -- log it and move on.
             # Move on to the next item in the worklist.
+            log_and_print("Address later: {} in file {} interval {} instance {}".format(
+                awd,
+                worklist[worklist_idx][1],
+                worklist[worklist_idx][2]+1,
+                worklist[worklist_idx][3]+1))
             worklist_idx += 1
             continue
         elif response == "q":
@@ -322,7 +333,7 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
 def main():
 
     ratio_threshold = 0.7
-    num_alternatives = None
+    max_alternatives = 10
 
     # Log everything that happens during the session in a log file.
     logdir = "log"
@@ -378,7 +389,7 @@ def main():
                 awd = prioritised_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd, tgdir,  typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
+                handle_wordtype(awd, tgdir,  typeslist, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
