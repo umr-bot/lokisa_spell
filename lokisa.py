@@ -26,7 +26,7 @@ colorama.init()
 
 def log_and_print(message):
     print(message)
-    logging.info(message)
+    logging.info(message.strip())
 
 def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold=0.0):
     """
@@ -351,7 +351,7 @@ def main():
 
     tgdir = "workingdir/textgrids"
 
-    log_and_print("Finding and parsing all TextGrid files in {}".format(tgdir))
+    log_and_print("\n\nFinding and parsing all TextGrid files in {}".format(tgdir))
     text_all = get_textgrid_text_all(tgdir)
     #text_all.sort()
 
