@@ -17,6 +17,7 @@ import textgrid
 import Levenshtein
 import logging
 import datetime
+import argparse
 from tqdm import tqdm
 from pprint import pprint
 
@@ -27,6 +28,33 @@ colorama.init()
 def log_and_print(message):
     print(message)
     logging.info(message.strip())
+
+
+def parse_command_line_arguments():
+    """Check the command line arguments."""
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--mandatory_wordlist_fn",
+        help="File name of a text file that contains a list of words that are mandatory to handle.",
+    )
+    parser.add_argument(
+        "--logdir",
+        default="log",
+        help="Directory where to store the log files. Default is log/",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Activate a debug mode.",
+    )
+
+    #if len(sys.argv) == 1:
+    #    parser.print_help()
+    #    sys.exit(1)
+
+    return parser.parse_args()
+
 
 def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold=0.0):
     """
@@ -130,7 +158,7 @@ def get_word_lengths(awlist, greater_than=0):
     return len_dict
 
 
-def get_prioritised_list(tokenlist, get_topN=100):
+def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None):
     """
     Build a prioritised list of word types that should be considered for
     checking. The top N (default N=100) word types are returned.
@@ -147,6 +175,38 @@ def get_prioritised_list(tokenlist, get_topN=100):
     tokenlist = [awd for awd in tokenlist if awd in len_dict]
 
     combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[3], reverse=True)
+
+    # Refine the list by grouping together the closest Levenshtein matches.
+    combined_list2 = []
+    added_set = set([])
+    for alen, awd, count_val, priority_val in combined_list:
+        if awd not in added_set:
+            matches = find_matches_faster(awd, typeslist, num_alternatives=2, ratio_threshold=0.7)
+            for amatch in matches:
+                if amatch[0] not in added_set:
+                    combined_list2.append((len_dict[amatch[0]], amatch[0], counts_dict[amatch[0]], len_dict[amatch[0]] + counts_dict[amatch[0]]))
+                    added_set.add(amatch[0])
+            # Add the word from the outer foor loop too.
+            combined_list2.append((alen, awd, count_val, priority_val))
+
+    combined_list = combined_list2
+
+    # Move/add mandatory words to the top of the list.
+    if mandatory_wordlist:
+        for amanwd in reversed(mandatory_wordlist):
+            print("Mandatory word:", amanwd)
+            if amanwd in typeslist:
+                # If a mandatory word is already in the combined list, move it to the top
+                for aidx, atuple in enumerate(combined_list):
+                    alen, awd, count_val, priority_val = atuple
+                    if awd == amanwd:
+                        combined_list.insert(0, combined_list.pop(aidx))
+                        break
+            else:
+                # If a mandatory word is not in the corpus, what do we do?
+                print("This mandatory word does not occur in the corpus. Ignoring it.")
+
+
     if get_topN != 0:
         combined_list = combined_list[0:get_topN]
 
@@ -334,9 +394,12 @@ def main():
 
     ratio_threshold = 0.7
     max_alternatives = 10
+    mandatory_wordlist = None
+
+    args = parse_command_line_arguments()
 
     # Log everything that happens during the session in a log file.
-    logdir = "log"
+    logdir = args.logdir
     os.makedirs(logdir, exist_ok=True)
     dtnow = datetime.datetime.now()
     datestr = dtnow.strftime("%y%m%d_%H%M%S")
@@ -359,13 +422,19 @@ def main():
     tokenlist = split_list(text_all)
     #tokenlist.sort()
 
+    if args.mandatory_wordlist_fn:
+        # Load word from the mandatory word list file
+        with open(args.mandatory_wordlist_fn, "r") as fid:
+            mandatory_wordlist = [awd.strip() for awd in fid]
+
+
     #counts_dict = get_token_counts(tokenlist, list(set(tokenlist)), greater_than=0)
     #tokenlist = [awd for awd in tokenlist if awd in counts_dict]
     #len_list = get_word_lengths(list(set(tokenlist)), greater_than=4)
 
     #combined_list = sorted([(acnt, awd, counts_dict[awd], acnt + counts_dict[awd]) for acnt, awd in len_list], key=lambda xx: xx[3], reverse=True)
     log_and_print("Prioritising word types.")
-    prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist)
+    prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist)
 
 
     #pprint(text_all)
