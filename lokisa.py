@@ -246,7 +246,6 @@ def set_coloured_word(astr, awrd, colorama_colour, instance=0):
     return " ".join(newstr)
 
 
-#def print_main_prompt(prioritised_list, start_idx=0, end_idx=10):
 def print_main_prompt(wordset_list, wordset_idx, num_word_sets):
     """
     Print the main menu and wait for a response.
@@ -262,6 +261,7 @@ def print_main_prompt(wordset_list, wordset_idx, num_word_sets):
         astr += "{:>4}: {:20} [Occurence count:{:5};  pscore:{:5}]\n".format(tcount, atup[1], atup[2], atup[3])
     astr += "{:>4}: {}\n".format("n", "Next word set.")
     astr += "{:>4}: {}\n".format("b", "Previous word set.")
+    astr += "{:>4}: {}\n".format("j", "Jump to a specific word set.")
     astr += "{:>4}: {}\n".format("q", "To quit the program.")
     print(astr)
     response = input("Enter your choice: ")
@@ -480,6 +480,20 @@ def main():
 
         elif response == "q":
             break
+
+        elif response == "j":
+            response = input("Enter the word set number: ")
+            if not response.isdigit():
+                print(response, "is not a number. Please enter a number for option j.")
+                continue
+
+            response = int(response) - 1
+            if (response < len(prioritised_list)) and (response >= 0):
+                wordset_idx = response
+            else:
+                print(response + 1, "is not valid. Please try again.")
+                input("Press Enter to continue.")
+                continue
 
         elif response == "n":
             if wordset_idx + 1 < len(prioritised_list):
