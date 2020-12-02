@@ -62,7 +62,9 @@ def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold
     Returns a list with tuples (word_label, Levenshtein_ratio)
     """
 
-    match_ratios = sorted([(awd, round(Levenshtein.ratio(inword, awd), 3)) for awd in wordlist], reverse=True, key=lambda xx: xx[1])
+    # Regarding the sorting, we first sort alphaberically, then we sort according ot the ratio.
+    match_ratios = sorted([(awd, round(Levenshtein.ratio(inword, awd), 3)) for awd in wordlist], key=lambda xx: xx[0])
+    match_ratios = sorted(match_ratios, reverse=True, key=lambda xx: xx[1])
     # Discard the first match which is the query word itself.
     if match_ratios[0][1] == 1.0:
         match_ratios = match_ratios[1:]
@@ -184,12 +186,12 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None, num_a
     typeslist = list(len_dict.keys())
     tokenlist = [awd for awd in tokenlist if awd in len_dict]
 
-    combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[3], reverse=True)
+    combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[1])
+    combined_list = sorted(combined_list, key=lambda xx: xx[3], reverse=True)
 
     # Move/add mandatory words to the top of the list.
     if mandatory_wordlist:
         for amanwd in reversed(mandatory_wordlist):
-            #print("Mandatory word:", amanwd)
             if amanwd in typeslist:
                 # If a mandatory word is already in the combined list, move it to the top
                 for aidx, atuple in enumerate(combined_list):
@@ -316,10 +318,8 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
             for icount in range(tg_words.count(awd)):
                 worklist.append((occ_cnt, atgfn, icnt, icount))
                 occ_cnt += 1
-    #pprint(worklist)
     num_occs = len(worklist)
 
-    #for occ_progress_count, atgfn, interval_count, instance_count in worklist:
     worklist_idx = 0
     while worklist_idx < len(worklist):
         # Unpack the items in the worklist
@@ -438,26 +438,17 @@ def main():
 
     log_and_print("\n\nFinding and parsing all TextGrid files in {}".format(tgdir))
     text_all = get_textgrid_text_all(tgdir)
-    #text_all.sort()
 
     log_and_print("Extracting all word tokens.")
     tokenlist = split_list(text_all)
-    #tokenlist.sort()
 
     if args.mandatory_wordlist_fn:
         # Load word from the mandatory word list file
         with open(args.mandatory_wordlist_fn, "r") as fid:
             mandatory_wordlist = [awd.strip() for awd in fid]
 
-
-    #counts_dict = get_token_counts(tokenlist, list(set(tokenlist)), greater_than=0)
-    #tokenlist = [awd for awd in tokenlist if awd in counts_dict]
-    #len_list = get_word_lengths(list(set(tokenlist)), greater_than=4)
-
-    #combined_list = sorted([(acnt, awd, counts_dict[awd], acnt + counts_dict[awd]) for acnt, awd in len_list], key=lambda xx: xx[3], reverse=True)
     log_and_print("Prioritising word types.")
     prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist, num_alternatives=prioritised_list_max_alternatives, ratio_threshold=prioritised_list_ratio_threshold)
-
 
     #pprint(text_all)
     #pprint(tokenlist)
@@ -472,17 +463,14 @@ def main():
 
         wordset_list = prioritised_list[wordset_idx]
         
-        #response = print_main_prompt(prioritised_list[wordset_idx], start_idx=mainmenu_start_idx, end_idx=mainmenu_start_idx+mainmenu_list_length)
         response = print_main_prompt(wordset_list, wordset_idx+1, len(prioritised_list))
 
         if response.isdigit():
-            #retcode = handle_digits(response, len(prioritised_list))
             retcode = handle_digits(response, len(wordset_list))
             if retcode is False:
                 input("Press Enter to continue.")
                 continue
             else:
-                #awd = prioritised_list[int(response)][1]
                 awd = wordset_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
