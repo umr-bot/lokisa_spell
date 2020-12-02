@@ -62,24 +62,34 @@ def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold
     Returns a list with tuples (word_label, Levenshtein_ratio)
     """
 
-    match_ratios = [(awd, Levenshtein.ratio(inword, awd)) for awd in wordlist]
-
-    if ratio_threshold > 0.0:
-        match_ratios = [(awd, levrat) for awd, levrat in match_ratios if levrat > ratio_threshold]
-
-    match_ratios = sorted([(awd, round(levrat, 3)) for awd, levrat in match_ratios if levrat > ratio_threshold], reverse=True, key=lambda xx: xx[1])
-
-    if num_alternatives is not None:
-        # Discard the first match which is the query word itself.
-        if len(match_ratios) > num_alternatives:
-            match_ratios = match_ratios[1:num_alternatives+1]
-        else:
-            match_ratios = match_ratios[1:]
-    else:
+    match_ratios = sorted([(awd, round(Levenshtein.ratio(inword, awd), 3)) for awd in wordlist], reverse=True, key=lambda xx: xx[1])
+    # Discard the first match which is the query word itself.
+    if match_ratios[0][1] == 1.0:
         match_ratios = match_ratios[1:]
 
-    return match_ratios
+    if ratio_threshold > 0.0:
+        match_ratios = [(awd, levrat) for awd, levrat in match_ratios if levrat >= ratio_threshold]
 
+    # Get the set of ratios
+    ratios_list = sorted(list(set([arat for awd, arat in match_ratios])), reverse=True)
+
+    # Pick from the highest ratios until we have the required number of alternatives
+    match_ratios_new = []
+
+    if num_alternatives:
+        if len(ratios_list) <= num_alternatives:
+            match_ratios_new = match_ratios
+        else:
+            ratio_cmp = ratios_list[num_alternatives-1]
+            for amatch in match_ratios:
+                if amatch[1] >= ratio_cmp:
+                    match_ratios_new.append(amatch)
+                else:
+                    break
+    else:
+        match_ratios_new = match_ratios
+
+    return match_ratios_new
 
 def get_textgrid_text(atgfn):
     tg = textgrid.TextGrid.fromFile(atgfn)
@@ -397,7 +407,7 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
 def main():
 
     ratio_threshold = 0.7
-    max_alternatives = 10
+    max_alternatives = 4
     mandatory_wordlist = None
 
     args = parse_command_line_arguments()
