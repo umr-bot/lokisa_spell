@@ -177,9 +177,10 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None):
     combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[3], reverse=True)
 
     # Refine the list by grouping together the closest Levenshtein matches.
+    log_and_print("Refining the prioritised word list.")
     combined_list2 = []
     added_set = set([])
-    for alen, awd, count_val, priority_val in combined_list:
+    for alen, awd, count_val, priority_val in tqdm(combined_list):
         if awd not in added_set:
             matches = find_matches_faster(awd, typeslist, num_alternatives=2, ratio_threshold=0.7)
             for amatch in matches:
@@ -320,7 +321,7 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
         for mcnt, amatch in enumerate(matches):
             pstr += "{:>5}: {:20} [match ratio: {}]\n".format(mcnt, amatch[0], amatch[1])
         pstr += "{:>5}: {:20}\n".format("e", "Or enter a new word that is not in the list above.")
-        pstr += "{:>5}: {:20}\n".format("l", "Or mark this item to be addressed at a later time.")
+        pstr += "{:>5}: {:20}\n".format("l", "Or enter a note or comment for this item.")
         pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
         pstr += "{:>5}: {:20}\n".format("q", "Or quit.")
         pstr += "{:>5}: {:20}\n".format("", "Pressing Enter without a choice will advance to the next occurrence.")
@@ -372,13 +373,16 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
             if worklist_idx > 0:
                 worklist_idx -= 1
         elif response == "l":
-            # Mark for later -- log it and move on.
-            # Move on to the next item in the worklist.
-            log_and_print("Address later: {} in file {} interval {} instance {}".format(
+            # Enter a note for this item, log it and move on.
+            response = input("Enter a note to save for this item and press Enter: ")
+            log_and_print("A note has been saved for {} in file {} interval {} instance {}:\n\n \"{}\"\n".format(
                 awd,
                 worklist[worklist_idx][1],
                 worklist[worklist_idx][2]+1,
-                worklist[worklist_idx][3]+1))
+                worklist[worklist_idx][3]+1,
+                response))
+            input("Press Enter to continue.")
+            # Move on to the next item in the worklist.
             worklist_idx += 1
             continue
         elif response == "q":
