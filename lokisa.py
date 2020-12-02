@@ -168,7 +168,7 @@ def get_word_lengths(awlist, greater_than=0):
     return len_dict
 
 
-def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None):
+def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None, num_alternatives=None, ratio_threshold=0.0):
     """
     Build a prioritised list of word types that should be considered for
     checking. The top N (default N=100) word types are returned.
@@ -186,26 +186,10 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None):
 
     combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[3], reverse=True)
 
-    # Refine the list by grouping together the closest Levenshtein matches.
-    log_and_print("Refining the prioritised word list.")
-    combined_list2 = []
-    added_set = set([])
-    for alen, awd, count_val, priority_val in tqdm(combined_list):
-        if awd not in added_set:
-            matches = find_matches_faster(awd, typeslist, num_alternatives=2, ratio_threshold=0.7)
-            for amatch in matches:
-                if amatch[0] not in added_set:
-                    combined_list2.append((len_dict[amatch[0]], amatch[0], counts_dict[amatch[0]], len_dict[amatch[0]] + counts_dict[amatch[0]]))
-                    added_set.add(amatch[0])
-            # Add the word from the outer foor loop too.
-            combined_list2.append((alen, awd, count_val, priority_val))
-
-    combined_list = combined_list2
-
     # Move/add mandatory words to the top of the list.
     if mandatory_wordlist:
         for amanwd in reversed(mandatory_wordlist):
-            print("Mandatory word:", amanwd)
+            #print("Mandatory word:", amanwd)
             if amanwd in typeslist:
                 # If a mandatory word is already in the combined list, move it to the top
                 for aidx, atuple in enumerate(combined_list):
@@ -215,13 +199,33 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None):
                         break
             else:
                 # If a mandatory word is not in the corpus, what do we do?
-                print("This mandatory word does not occur in the corpus. Ignoring it.")
+                print("The mandatory word,", amanwd,", does not occur in the corpus. Ignoring it.")
 
+    # Refine the list by grouping together the closest Levenshtein matches to form "word sets" for checking and editing.
+    log_and_print("Refining the prioritised word list.")
+    combined_list2 = []
+    added_set = set([])
+    for alen, awd, count_val, priority_val in tqdm(combined_list):
+        if awd not in added_set:
+            added_set.add(awd)
+            wordset = []
+            matches = find_matches_faster(awd, typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
+            for amatch in matches:
+                if amatch[0] not in added_set:
+                    wordset.append((len_dict[amatch[0]], amatch[0], counts_dict[amatch[0]], len_dict[amatch[0]] + counts_dict[amatch[0]]))
+                    added_set.add(amatch[0])
+            # Add the word from the outer foor loop too.
+            wordset.append((alen, awd, count_val, priority_val))
+            combined_list2.append(wordset)
 
-    if get_topN != 0:
-        combined_list = combined_list[0:get_topN]
+    if len(added_set) != len(typeslist):
+        print("len(added_set) != len(typeslist)")
+        print(len(added_set), "!=", len(typeslist))
 
-    return combined_list, tokenlist, typeslist
+    #if get_topN != 0:
+    #    combined_list = combined_list[0:get_topN]
+
+    return combined_list2, tokenlist, typeslist
 
 
 def set_coloured_word(astr, awrd, colorama_colour, instance=0):
@@ -240,7 +244,8 @@ def set_coloured_word(astr, awrd, colorama_colour, instance=0):
     return " ".join(newstr)
 
 
-def print_main_prompt(prioritised_list, start_idx=0, end_idx=10):
+#def print_main_prompt(prioritised_list, start_idx=0, end_idx=10):
+def print_main_prompt(wordset_list, wordset_idx, num_word_sets):
     """
     Print the main menu and wait for a response.
     Return the value of the response.
@@ -248,12 +253,13 @@ def print_main_prompt(prioritised_list, start_idx=0, end_idx=10):
 
     print("\n=========================================================================================================")
     print("=========================================================================================================\n")
+    print("Word set", wordset_idx, "of", num_word_sets,"\n")
     astr = "Which word do you wish to work on?\n"
-    for tcount, atup in enumerate(prioritised_list):
-        if tcount >= start_idx and tcount < end_idx:
-            astr += "{:>4}: {:20} [Occurence count:{:5};  pscore:{:5}]\n".format(tcount, atup[1], atup[2], atup[3])
-    astr += "{:>4}: {}\n".format("n", "Next 10 words.")
-    astr += "{:>4}: {}\n".format("b", "Previous 10 words.")
+    for tcount, atup in enumerate(wordset_list):
+        #if tcount >= start_idx and tcount < end_idx:
+        astr += "{:>4}: {:20} [Occurence count:{:5};  pscore:{:5}]\n".format(tcount, atup[1], atup[2], atup[3])
+    astr += "{:>4}: {}\n".format("n", "Next word set.")
+    astr += "{:>4}: {}\n".format("b", "Previous word set.")
     astr += "{:>4}: {}\n".format("q", "To quit the program.")
     print(astr)
     response = input("Enter your choice: ")
@@ -406,6 +412,8 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
 
 def main():
 
+    prioritised_list_ratio_threshold = 0.7
+    prioritised_list_max_alternatives = 2
     ratio_threshold = 0.7
     max_alternatives = 4
     mandatory_wordlist = None
@@ -448,7 +456,7 @@ def main():
 
     #combined_list = sorted([(acnt, awd, counts_dict[awd], acnt + counts_dict[awd]) for acnt, awd in len_list], key=lambda xx: xx[3], reverse=True)
     log_and_print("Prioritising word types.")
-    prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist)
+    prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist, num_alternatives=prioritised_list_max_alternatives, ratio_threshold=prioritised_list_ratio_threshold)
 
 
     #pprint(text_all)
@@ -459,17 +467,23 @@ def main():
 
     mainmenu_start_idx = 0
     mainmenu_list_length = 10
+    wordset_idx = 0
     while True:
+
+        wordset_list = prioritised_list[wordset_idx]
         
-        response = print_main_prompt(prioritised_list, start_idx=mainmenu_start_idx, end_idx=mainmenu_start_idx+mainmenu_list_length)
+        #response = print_main_prompt(prioritised_list[wordset_idx], start_idx=mainmenu_start_idx, end_idx=mainmenu_start_idx+mainmenu_list_length)
+        response = print_main_prompt(wordset_list, wordset_idx+1, len(prioritised_list))
 
         if response.isdigit():
-            retcode = handle_digits(response, len(prioritised_list))
+            #retcode = handle_digits(response, len(prioritised_list))
+            retcode = handle_digits(response, len(wordset_list))
             if retcode is False:
                 input("Press Enter to continue.")
                 continue
             else:
-                awd = prioritised_list[int(response)][1]
+                #awd = prioritised_list[int(response)][1]
+                awd = wordset_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
                 handle_wordtype(awd, tgdir,  typeslist, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
@@ -480,12 +494,12 @@ def main():
             break
 
         elif response == "n":
-            if (mainmenu_start_idx + mainmenu_list_length) < len(prioritised_list):
-                mainmenu_start_idx += mainmenu_list_length
+            if wordset_idx + 1 < len(prioritised_list):
+                wordset_idx += 1
 
         elif response == "b":
-            if (mainmenu_start_idx - mainmenu_list_length) >= 0:
-                mainmenu_start_idx -= mainmenu_list_length
+            if wordset_idx > 0:
+                wordset_idx -= 1
 
 if __name__ == "__main__":
     try:
