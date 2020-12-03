@@ -227,7 +227,7 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None, num_a
     #if get_topN != 0:
     #    combined_list = combined_list[0:get_topN]
 
-    return combined_list2, tokenlist, typeslist
+    return combined_list2, tokenlist, typeslist, counts_dict
 
 
 def set_coloured_word(astr, awrd, colorama_colour, instance=0):
@@ -296,7 +296,7 @@ def handle_digits(invalue, limhi, limlo=0, action_fc=None):
     return retcode
 
 
-def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshold=0.0):
+def handle_wordtype(awd, tgdir, typeslist, counts_dict, num_alternatives=None, ratio_threshold=0.0):
     """
     """
 
@@ -336,11 +336,11 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
         print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
         pstr = "Change it to:\n"
         for mcnt, amatch in enumerate(matches):
-            pstr += "{:>5}: {:20} [match ratio: {}]\n".format(mcnt, amatch[0], amatch[1])
+            pstr += "{:>5}: {:20} [Occurrence count:{:5};  match ratio: {:<5}]\n".format(mcnt, amatch[0], counts_dict[amatch[0]], amatch[1])
         pstr += "{:>5}: {:20}\n".format("e", "Or enter a new word that is not in the list above.")
         pstr += "{:>5}: {:20}\n".format("l", "Or enter a note or comment for this item.")
         pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
-        pstr += "{:>5}: {:20}\n".format("q", "Or quit.")
+        pstr += "{:>5}: {:20}\n".format("q", "Or quit and go back to main menu.")
         pstr += "{:>5}: {:20}\n".format("", "Pressing Enter without a choice will advance to the next occurrence.")
         print(pstr)
         response = input("Please enter your choice: ")
@@ -409,6 +409,8 @@ def handle_wordtype(awd, tgdir, typeslist, num_alternatives=None, ratio_threshol
             print("\"{}\" is not a valid choice. Please try again.".format(response))
             continue
 
+        if worklist_idx >= len(worklist):
+            print("The end of the work list for \"{}\" has been reached.".format(awd))
 
 
 def main():
@@ -449,7 +451,7 @@ def main():
             mandatory_wordlist = [awd.strip() for awd in fid]
 
     log_and_print("Prioritising word types.")
-    prioritised_list, tokenlist, typeslist = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist, num_alternatives=prioritised_list_max_alternatives, ratio_threshold=prioritised_list_ratio_threshold)
+    prioritised_list, tokenlist, typeslist, counts_dict = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist, num_alternatives=prioritised_list_max_alternatives, ratio_threshold=prioritised_list_ratio_threshold)
 
     #pprint(text_all)
     #pprint(tokenlist)
@@ -475,7 +477,7 @@ def main():
                 awd = wordset_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd, tgdir, typeslist, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
+                handle_wordtype(awd, tgdir, typeslist, counts_dict, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
@@ -502,7 +504,7 @@ def main():
                 awd = response
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd, tgdir, typeslist, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
+                handle_wordtype(awd, tgdir, typeslist, counts_dict, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
