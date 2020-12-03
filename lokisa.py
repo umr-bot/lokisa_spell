@@ -25,6 +25,10 @@ import colorama
 colorama.init()
 
 class InputText:
+    """
+    The InputText class handles some basic IO and provide utility functions
+    for the input TextGrid or plain text files.
+    """
     def __init__(self, directory="workingdir/textgrids", informat="textgrid"):
         # Directory where the input text files reside.
         self.directory = directory
@@ -38,7 +42,7 @@ class InputText:
         return [interval.mark for interval in tg[0]]
 
     def get_plaintext_text(self, atfn):
-        with open(atfn) as fid:
+        with open(atfn, "r") as fid:
             textout = [aline.strip() for aline in fid if aline != ""]
 
         return textout
@@ -75,7 +79,10 @@ class InputText:
             return tg_words
 
         elif self.informat == "plaintext":
-            pass
+            with open(afn, "r") as fid:
+                for icnt, aline in enumerate(fid):
+                    if icnt == interval_or_line_count:
+                        return aline.strip().split()
 
 
     def build_worklist(self, focus_word):
@@ -100,7 +107,22 @@ class InputText:
             return worklist
 
         elif self.informat == "plaintext":
-            pass
+            atgfn_list = glob.glob(os.path.join(self.directory, "**/*.txt"), recursive=True)
+            atgfn_list.sort()
+
+            # First draw up a list of all the occurrences in all the text files so that we can
+            # traverse them if required
+            worklist = []
+            occ_cnt = 0
+            for atgfn in tqdm(atgfn_list):
+                with open(atgfn, "r") as fid:
+                    for icnt, aline in enumerate(fid):
+                        tg_words = aline.strip().split()
+                        for icount in range(tg_words.count(focus_word)):
+                            worklist.append((occ_cnt, atgfn, icnt, icount))
+                            occ_cnt += 1
+
+            return worklist
 
 def log_and_print(message):
     print(message)
@@ -199,11 +221,11 @@ def split_list(
     """
     removes = []
     if remove_fra:
-        removes += '_fra'
+        removes += ['_fra']
     if remove_ara:
-        removes += '_ara'
+        removes += ['_ara']
     if remove_eng:
-        removes += '_eng'
+        removes += ['_eng']
     removes = tuple(removes)
     tokenlist = []
 
