@@ -24,6 +24,83 @@ from pprint import pprint
 import colorama
 colorama.init()
 
+class InputText:
+    def __init__(self, directory="workingdir/textgrids", informat="textgrid"):
+        # Directory where the input text files reside.
+        self.directory = directory
+        # The format of the input text. Currently either textgrid or plaintext.
+        self.informat = informat
+
+
+    def get_textgrid_text(self, atgfn):
+        tg = textgrid.TextGrid.fromFile(atgfn)
+
+        return [interval.mark for interval in tg[0]]
+
+    def get_plaintext_text(self, atfn):
+        with open(atfn) as fid:
+            textout = [aline.strip() for aline in fid if aline != ""]
+
+        return textout
+
+
+    def get_text_all(self):
+        """
+        Find all the TextGrid files in the given directory and read in all the
+        annotations. Return the annotations as a list of text string.
+        """
+
+        if self.informat == "textgrid":
+            globpat = "**/*.TextGrid"
+            fun_get_text = self.get_textgrid_text
+        elif self.informat == "plaintext":
+            globpat = "**/*.txt"
+            fun_get_text = self.get_plaintext_text
+
+        fn_list = glob.glob(os.path.join(self.directory, globpat), recursive=True)
+        fn_list.sort()
+
+        text_list = []
+        for afn in tqdm(fn_list):
+            text_list.extend(fun_get_text(afn))
+
+        return text_list
+
+    def get_sentence_at(self, afn, interval_or_line_count):
+
+        if self.informat == "textgrid":
+            tg = textgrid.TextGrid.fromFile(afn)
+            interval =  tg[0][interval_or_line_count]
+            tg_words = interval.mark.strip().split()
+            return tg_words
+
+        elif self.informat == "plaintext":
+            pass
+
+
+    def build_worklist(self, focus_word):
+        if self.informat == "textgrid":
+
+            atgfn_list = glob.glob(os.path.join(self.directory, "**/*.TextGrid"), recursive=True)
+            atgfn_list.sort()
+
+            # First draw up a list of all the occurrences in all the textgrids so that we can
+            # traverse them if required
+            worklist = []
+            occ_cnt = 0
+            for atgfn in tqdm(atgfn_list):
+                tg = textgrid.TextGrid.fromFile(atgfn)
+                for icnt in range(len(tg[0])):
+                    interval =  tg[0][icnt]
+                    tg_words = interval.mark.strip().split()
+                    for icount in range(tg_words.count(focus_word)):
+                        worklist.append((occ_cnt, atgfn, icnt, icount))
+                        occ_cnt += 1
+
+            return worklist
+
+        elif self.informat == "plaintext":
+            pass
 
 def log_and_print(message):
     print(message)
@@ -34,6 +111,17 @@ def parse_command_line_arguments():
     """Check the command line arguments."""
     parser = argparse.ArgumentParser()
 
+    parser.add_argument(
+        "--input_text_dir",
+        default="workingdir/textgrids",
+        help="Directory where the input text or textgrid files reside.",
+    )
+    parser.add_argument(
+        "--input_text_format",
+        choices=["plaintext", "textgrid"],
+        default="textgrid",
+        help="Format of the input text files.",
+    )
     parser.add_argument(
         "--mandatory_wordlist_fn",
         help="File name of a text file that contains a list of words that are mandatory to handle.",
@@ -93,25 +181,6 @@ def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold
 
     return match_ratios_new
 
-def get_textgrid_text(atgfn):
-    tg = textgrid.TextGrid.fromFile(atgfn)
-
-    return [interval.mark for interval in tg[0]]
-
-
-def get_textgrid_text_all(atgdir):
-    """
-    Find all the TextGrid files in the given directory and read in all the
-    annotations. Return the annotations as a list of text string.
-    """
-    atgfn_list = glob.glob(os.path.join(atgdir, "**/*.TextGrid"), recursive=True)
-    atgfn_list.sort()
-
-    text_list = []
-    for atgfn in tqdm(atgfn_list):
-        text_list.extend(get_textgrid_text(atgfn))
-
-    return text_list
 
 def split_list(
         inlist,
@@ -296,29 +365,14 @@ def handle_digits(invalue, limhi, limlo=0, action_fc=None):
     return retcode
 
 
-def handle_wordtype(awd, tgdir, typeslist, counts_dict, num_alternatives=None, ratio_threshold=0.0):
+def handle_wordtype(awd, inputtext, typeslist, counts_dict, num_alternatives=None, ratio_threshold=0.0):
     """
     """
 
     matches = find_matches_faster(awd, typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
 
-    atgfn_list = glob.glob(os.path.join(tgdir, "**/*.TextGrid"), recursive=True)
-    atgfn_list.sort()
-
-    # First draw up a list of all the occurrences in all the textgrids so that we can
-    # traverse them if required
     log_and_print("Building the worklist.")
-    worklist = []
-    occ_cnt = 0
-    for atgfn in tqdm(atgfn_list):
-        tg = textgrid.TextGrid.fromFile(atgfn)
-        #for interval in tg[0]:
-        for icnt in range(len(tg[0])):
-            interval =  tg[0][icnt]
-            tg_words = interval.mark.strip().split()
-            for icount in range(tg_words.count(awd)):
-                worklist.append((occ_cnt, atgfn, icnt, icount))
-                occ_cnt += 1
+    worklist = inputtext.build_worklist(awd)
     num_occs = len(worklist)
 
     worklist_idx = 0
@@ -326,14 +380,12 @@ def handle_wordtype(awd, tgdir, typeslist, counts_dict, num_alternatives=None, r
         # Unpack the items in the worklist
         occ_progress_count, atgfn, interval_count, instance_count = worklist[worklist_idx]
 
-        tg = textgrid.TextGrid.fromFile(atgfn)
-        interval =  tg[0][interval_count]
-        tg_words = interval.mark.strip().split()
+        tg_words = inputtext.get_sentence_at(atgfn, interval_count)
         print("\n=========================================================================================================")
         print("=========================================================================================================\n")
         print("Occurence number {} of {}\n".format(occ_progress_count+1, num_occs))
         print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
-        print("{}\n".format(set_coloured_word(interval.mark, awd, colorama.Fore.YELLOW, instance=instance_count)))
+        print("{}\n".format(set_coloured_word(" ".join(tg_words), awd, colorama.Fore.YELLOW, instance=instance_count)))
         pstr = "Change it to:\n"
         for mcnt, amatch in enumerate(matches):
             pstr += "{:>5}: {:20} [Occurrence count:{:5};  match ratio: {:<5}]\n".format(mcnt, amatch[0], counts_dict[amatch[0]], amatch[1])
@@ -436,11 +488,10 @@ def main():
         })
     logging.info("Starting Lokisa Spell.")
 
+    log_and_print("\n\nFinding and parsing all TextGrid files in {}".format(args.input_text_dir))
 
-    tgdir = "workingdir/textgrids"
-
-    log_and_print("\n\nFinding and parsing all TextGrid files in {}".format(tgdir))
-    text_all = get_textgrid_text_all(tgdir)
+    it_if = InputText(directory=args.input_text_dir, informat=args.input_text_format)
+    text_all = it_if.get_text_all()
 
     log_and_print("Extracting all word tokens.")
     tokenlist = split_list(text_all)
@@ -477,7 +528,7 @@ def main():
                 awd = wordset_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd, tgdir, typeslist, counts_dict, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
+                handle_wordtype(awd, it_if, typeslist, counts_dict, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
@@ -504,7 +555,7 @@ def main():
                 awd = response
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd, tgdir, typeslist, counts_dict, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
+                handle_wordtype(awd, it_if, typeslist, counts_dict, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
