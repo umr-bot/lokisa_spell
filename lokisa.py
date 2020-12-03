@@ -262,6 +262,7 @@ def print_main_prompt(wordset_list, wordset_idx, num_word_sets):
     astr += "{:>4}: {}\n".format("n", "Next word set.")
     astr += "{:>4}: {}\n".format("b", "Previous word set.")
     astr += "{:>4}: {}\n".format("j", "Jump to a specific word set.")
+    astr += "{:>4}: {}\n".format("e", "Enter a specific word to edit.")
     astr += "{:>4}: {}\n".format("q", "To quit the program.")
     print(astr)
     response = input("Enter your choice: ")
@@ -474,7 +475,7 @@ def main():
                 awd = wordset_list[int(response)][1]
                 log_and_print("Let's work on \"{}\"".format(awd))
                 input("Press Enter to continue.")
-                handle_wordtype(awd, tgdir,  typeslist, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
+                handle_wordtype(awd, tgdir, typeslist, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
                 log_and_print("Going back to the main menu.")
                 input("Press Enter to continue.")
 
@@ -492,6 +493,21 @@ def main():
                 wordset_idx = response
             else:
                 print(response + 1, "is not valid. Please try again.")
+                input("Press Enter to continue.")
+                continue
+
+        elif response == "e":
+            response = input("Enter a word to work on: ")
+            if response in typeslist:
+                awd = response
+                log_and_print("Let's work on \"{}\"".format(awd))
+                input("Press Enter to continue.")
+                handle_wordtype(awd, tgdir, typeslist, num_alternatives=max_alternatives, ratio_threshold=ratio_threshold)
+                log_and_print("Going back to the main menu.")
+                input("Press Enter to continue.")
+
+            else:
+                print(response, "is not in the vocabulary of the dataset. Please enter a word that is part of the vocabulary.")
                 input("Press Enter to continue.")
                 continue
 
