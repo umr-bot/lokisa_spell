@@ -184,6 +184,9 @@ def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold
     # Sort according to the ratio.
     match_ratios = sorted([(awd, Levenshtein.ratio(inword, awd)) for awd in wordlist], reverse=True, key=lambda xx: xx[1])
 
+    if not match_ratios:
+        return []
+
     # Discard the first match which is the query word itself.
     if match_ratios[0][1] == 1.0:
         match_ratios = match_ratios[1:]
@@ -281,11 +284,9 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None, num_a
 
     log_and_print("Calculating occurrence counts.")
     counts_dict = get_token_counts(tokenlist)
-    tokenlist = [awd for awd in tokenlist if awd in counts_dict]
     log_and_print("Calculating word lengths.")
-    len_dict = get_word_lengths(list(set(tokenlist)), greater_than=4)
+    len_dict = get_word_lengths(sorted([awd for awd in counts_dict if awd != "<UNK>"]), greater_than=4)
     typeslist = sorted(list(len_dict.keys()))
-    tokenlist = [awd for awd in tokenlist if awd in len_dict]
 
     combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[1])
     combined_list = sorted(combined_list, key=lambda xx: xx[3], reverse=True)
@@ -307,28 +308,24 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None, num_a
     # Refine the list by grouping together the closest Levenshtein matches to form "word sets" for checking and editing.
     log_and_print("Refining the prioritised word list.")
     combined_list2 = []
-    added_set = set([])
+    # Make a copy of the types list that we will prune as we iterate the loop. The idea is to make the loop faster
+    # as we progress, since the typelist search space becomes smaller.
+    typeslist2 = list(typeslist)
     for alen, awd, count_val, priority_val in tqdm(combined_list):
-        if awd not in added_set:
-            added_set.add(awd)
-            wordset = []
-            matches = find_matches_faster(awd, typeslist, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
-            for amatch in matches:
-                if amatch[0] not in added_set:
-                    wordset.append((len_dict[amatch[0]], amatch[0], counts_dict[amatch[0]], len_dict[amatch[0]] + counts_dict[amatch[0]]))
-                    added_set.add(amatch[0])
-            # Add the word from the outer foor loop too.
-            wordset.append((alen, awd, count_val, priority_val))
-            combined_list2.append(wordset)
+        if typeslist2:
+            if awd in typeslist2:
+                typeslist2.remove(awd)
+                wordset = []
+                matches = find_matches_faster(awd, typeslist2, num_alternatives=num_alternatives, ratio_threshold=ratio_threshold)
+                for amatch in matches:
+                    if amatch[0] in typeslist2:
+                        typeslist2.remove(amatch[0])
+                        wordset.append((len_dict[amatch[0]], amatch[0], counts_dict[amatch[0]], len_dict[amatch[0]] + counts_dict[amatch[0]]))
+                # Add the word from the outer foor loop too.
+                wordset.append((alen, awd, count_val, priority_val))
+                combined_list2.append(wordset)
 
-    if len(added_set) != len(typeslist):
-        print("len(added_set) != len(typeslist)")
-        print(len(added_set), "!=", len(typeslist))
-
-    #if get_topN != 0:
-    #    combined_list = combined_list[0:get_topN]
-
-    return combined_list2, tokenlist, typeslist, counts_dict
+    return combined_list2, typeslist, counts_dict
 
 
 def set_coloured_word(astr, awrd, colorama_colour, instance=0):
@@ -534,7 +531,7 @@ def main():
             mandatory_wordlist = [awd.strip() for awd in fid]
 
     log_and_print("Prioritising word types.")
-    prioritised_list, tokenlist, typeslist, counts_dict = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist, num_alternatives=prioritised_list_max_alternatives, ratio_threshold=prioritised_list_ratio_threshold)
+    prioritised_list, typeslist, counts_dict = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist, num_alternatives=prioritised_list_max_alternatives, ratio_threshold=prioritised_list_ratio_threshold)
 
     #pprint(text_all)
     #pprint(tokenlist)
@@ -603,6 +600,9 @@ def main():
         elif response == "b":
             if wordset_idx > 0:
                 wordset_idx -= 1
+
+        elif response == "":
+            continue
 
         else:
             print(response, "is not a valid option. Please try again.")
