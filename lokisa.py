@@ -15,6 +15,7 @@ import os
 import glob
 import textgrid
 import Levenshtein
+from nltk.lm import Vocabulary
 import logging
 import datetime
 import argparse
@@ -36,19 +37,27 @@ class InputText:
         self.informat = informat
 
 
-    def get_textgrid_text(self, atgfn):
+    def get_textgrid_text(self, atgfn, do_split=False):
         tg = textgrid.TextGrid.fromFile(atgfn)
 
-        return [interval.mark for interval in tg[0]]
+        if do_split:
+            textout = [interval.mark.strip().split() for interval in tg[0]]
+        else:
+            textout = [interval.mark.strip() for interval in tg[0]]
 
-    def get_plaintext_text(self, atfn):
+        return textout
+
+    def get_plaintext_text(self, atfn, do_split=False):
         with open(atfn, "r") as fid:
-            textout = [aline.strip() for aline in fid if aline != ""]
+            if do_split:
+                textout = [aline.strip().split() for aline in fid if aline != ""]
+            else:
+                textout = [aline.strip() for aline in fid if aline != ""]
 
         return textout
 
 
-    def get_text_all(self):
+    def get_text_all(self, do_split=False):
         """
         Find all the TextGrid files in the given directory and read in all the
         annotations. Return the annotations as a list of text string.
@@ -66,7 +75,7 @@ class InputText:
 
         text_list = []
         for afn in tqdm(fn_list):
-            text_list.extend(fun_get_text(afn))
+            text_list.extend(fun_get_text(afn, do_split=do_split))
 
         return text_list
 
@@ -172,9 +181,9 @@ def find_matches_faster(inword, wordlist, num_alternatives=None, ratio_threshold
     Returns a list with tuples (word_label, Levenshtein_ratio)
     """
 
-    # Regarding the sorting, we first sort alphaberically, then we sort according ot the ratio.
-    match_ratios = sorted([(awd, round(Levenshtein.ratio(inword, awd), 3)) for awd in wordlist], key=lambda xx: xx[0])
-    match_ratios = sorted(match_ratios, reverse=True, key=lambda xx: xx[1])
+    # Sort according to the ratio.
+    match_ratios = sorted([(awd, Levenshtein.ratio(inword, awd)) for awd in wordlist], reverse=True, key=lambda xx: xx[1])
+
     # Discard the first match which is the query word itself.
     if match_ratios[0][1] == 1.0:
         match_ratios = match_ratios[1:]
@@ -243,12 +252,13 @@ def split_list(
 
     return tokenlist
 
-def get_token_counts(tokenlist, typeslist, greater_than=0):
+def get_token_counts(tokenlist, greater_than=0):
     """
     Calculate the occurrence counts of each word type given the full list of word tokens.
     The counts are return as a dictionary where the key is the word type and the value is the count.
     """
-    return {awty: tokenlist.count(awty) for awty in tqdm(typeslist) if tokenlist.count(awty) > greater_than}
+    # The slow way of counting:  {awty: tokenlist.count(awty) for awty in tqdm(typeslist) if tokenlist.count(awty) > greater_than}
+    return Vocabulary(tokenlist, unk_cutoff=greater_than + 1)
 
 
 def get_word_lengths(awlist, greater_than=0):
@@ -270,11 +280,11 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None, num_a
     """
 
     log_and_print("Calculating occurrence counts.")
-    counts_dict = get_token_counts(tokenlist, list(set(tokenlist)), greater_than=0)
+    counts_dict = get_token_counts(tokenlist)
     tokenlist = [awd for awd in tokenlist if awd in counts_dict]
     log_and_print("Calculating word lengths.")
     len_dict = get_word_lengths(list(set(tokenlist)), greater_than=4)
-    typeslist = list(len_dict.keys())
+    typeslist = sorted(list(len_dict.keys()))
     tokenlist = [awd for awd in tokenlist if awd in len_dict]
 
     combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[1])
@@ -410,7 +420,7 @@ def handle_wordtype(awd, inputtext, typeslist, counts_dict, num_alternatives=Non
         print("{}\n".format(set_coloured_word(" ".join(tg_words), awd, colorama.Fore.YELLOW, instance=instance_count)))
         pstr = "Change it to:\n"
         for mcnt, amatch in enumerate(matches):
-            pstr += "{:>5}: {:20} [Occurrence count:{:5};  match ratio: {:<5}]\n".format(mcnt, amatch[0], counts_dict[amatch[0]], amatch[1])
+            pstr += "{:>5}: {:20} [Occurrence count:{:5};  match ratio: {:<5.3}]\n".format(mcnt, amatch[0], counts_dict[amatch[0]], amatch[1])
         pstr += "{:>5}: {:20}\n".format("e", "Or enter a new word that is not in the list above.")
         pstr += "{:>5}: {:20}\n".format("l", "Or enter a note or comment for this item.")
         pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
