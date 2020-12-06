@@ -1,0 +1,8 @@
+# This file is used to add words to a mandatory work list.
+# These words are considered first and enjoy priority above
+# the words taken from the automatically generated prioritised list.
+# There may be only one word per line.
+# Lines that start with a hash (#) are ignored and may be used as comments.
+# Word are considered in the orther that they are given in the list.
+Bamakɔ
+Bamako

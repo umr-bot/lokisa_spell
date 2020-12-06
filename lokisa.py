@@ -528,7 +528,7 @@ def main():
     if args.mandatory_wordlist_fn:
         # Load word from the mandatory word list file
         with open(args.mandatory_wordlist_fn, "r") as fid:
-            mandatory_wordlist = [awd.strip() for awd in fid]
+            mandatory_wordlist = [awd.strip() for awd in fid if not awd.startswith('#')]
 
     log_and_print("Prioritising word types.")
     prioritised_list, typeslist, counts_dict = get_prioritised_list(tokenlist, mandatory_wordlist=mandatory_wordlist, num_alternatives=prioritised_list_max_alternatives, ratio_threshold=prioritised_list_ratio_threshold)

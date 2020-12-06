@@ -6,6 +6,6 @@ cd /home/lokisa/lokisa_spell
 
 conda activate $(pwd)/conda_env
 
-python lokisa.py
+python lokisa.py --mandatory_wordlist_fn conf/bam_mandatory_wordlist.txt
 
 conda deactivate
