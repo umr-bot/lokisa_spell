@@ -604,6 +604,10 @@ def main():
             if wordset_idx > 0:
                 wordset_idx -= 1
 
+        else:
+            print(response, "is not a valid option. Please try again.")
+            input("Press Enter to continue.")
+
 if __name__ == "__main__":
     try:
         main()
