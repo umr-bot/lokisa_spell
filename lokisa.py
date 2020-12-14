@@ -361,6 +361,7 @@ def print_main_prompt(wordset_list, wordset_idx, num_word_sets):
     astr += "{:>4}: {}\n".format("b", "Previous word set.")
     astr += "{:>4}: {}\n".format("j", "Jump to a specific word set.")
     astr += "{:>4}: {}\n".format("e", "Enter a specific word to edit.")
+    astr += "{:>4}: {}\n".format("s", "Search for a word in the vocabulary.")
     astr += "{:>4}: {}\n".format("q", "To quit the program.")
     print(astr)
     response = input("Enter your choice: ")
@@ -599,6 +600,24 @@ def main():
             else:
                 print(response, "is not in the vocabulary of the dataset. Please enter a word that is part of the vocabulary.")
                 input("Press Enter to continue.")
+                continue
+
+        elif response == "s":
+            response = input("Enter a word to search for: ")
+            if response in typeslist:
+                awd = response
+                print("The word \"{}\" is found in the vocabulary.".format(awd))
+                input("Press Enter to continue.")
+
+            else:
+                matches = find_matches_faster(response, typeslist, num_alternatives=2, ratio_threshold=0.6)
+                if not matches:
+                    print("No close matching words were found. Please try again with a different spelling.")
+                else:
+                    print("The following closely matching words were found:\n")
+                    for amatch in matches:
+                        print("{:20} [Occurence count:{:5}, match ratio:{:6.3}]".format(amatch[0], counts_dict[amatch[0]], amatch[1]))
+                input("\nPress Enter to continue.")
                 continue
 
         elif response == "n":
