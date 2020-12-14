@@ -419,6 +419,7 @@ def handle_wordtype(awd, inputtext, typeslist, counts_dict, num_alternatives=Non
         for mcnt, amatch in enumerate(matches):
             pstr += "{:>5}: {:20} [Occurrence count:{:5};  match ratio: {:<5.3}]\n".format(mcnt, amatch[0], counts_dict[amatch[0]], amatch[1])
         pstr += "{:>5}: {:20}\n".format("e", "Or enter a new word that is not in the list above.")
+        pstr += "{:>5}: {:20}\n".format("a", "Or change all occurrences to an option in the list above.")
         pstr += "{:>5}: {:20}\n".format("l", "Or enter a note or comment for this item.")
         pstr += "{:>5}: {:20}\n".format("b", "Or go to previous item.")
         pstr += "{:>5}: {:20}\n".format("q", "Or quit and go back to main menu.")
@@ -466,6 +467,13 @@ def handle_wordtype(awd, inputtext, typeslist, counts_dict, num_alternatives=Non
                 response))
             matches.append((response, 0.0))
             worklist_idx += 1
+        elif response == "a":
+            # Log a global edit here, i.e. all instances of this spelling should be changed to the proposed one.
+            response = input("Enter the option number (0 to {}) and press Enter: ".format(len(matches)-1))
+            log_and_print("Globally change {} to {} in all the transcriptions.".format(
+                awd,
+                matches[int(response)][0]))
+            worklist_idx = len(worklist)
         elif response == "b":
             # Step back by decrementing the worklist index
             if worklist_idx > 0:
