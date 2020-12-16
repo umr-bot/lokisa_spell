@@ -4,5 +4,63 @@
 # There may be only one word per line.
 # Lines that start with a hash (#) are ignored and may be used as comments.
 # Word are considered in the orther that they are given in the list.
+binkanni
+faga
+jihadisi
+jiyadisi
+kɛlɛ
+marifa
+MINUSMA
+ONU
+terorisi
+sorasi
+Barkhane
+barkhane
+FAMa
+fama
+Mali
+mali
+Al Qaida
+al qaida
+Qaida
+qaida
+Ansar Dine
+Ansar ul Islam
+Etat_fra Islamique_fra
+MNLA
+Boko haram
+boko haram
+Boko
+boko
+Haram
+haram
+HCUA
+CMA
+Jatigɛwale gurupu sahara kɔnɔ
+jatigɛwale gurupu sahara kɔnɔ
+Etat_fra Islamique_fra sahara kɔnɔ
+katiba
+Amadu Kufa ka jatigɛwale gurupu
+Kufa ka mɔgɔw
+JNIM
+Al Mourabitoun
+al mourabitoun
+Mourabitoun
+mourabitoun
+Dan Na Anbasagu
+dan na anbasagu
+anbasagu
+donsow
+Masina Katiba
+masina katiba
+Onusienne
+onusienne
+casque bleu
+shiya kɛlɛ
+damatɛmɛn
+shiya
+nisɔgoya yira
 Bamakɔ
+bamakɔ
 Bamako
+bamako

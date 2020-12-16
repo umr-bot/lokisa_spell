@@ -264,12 +264,15 @@ def get_token_counts(tokenlist, greater_than=0):
     return Vocabulary(tokenlist, unk_cutoff=greater_than + 1)
 
 
-def get_word_lengths(awlist, greater_than=0):
+def get_word_lengths(awlist, greater_than=0, mandatory_wordlist=None):
     """
     Calculate the length of each word in the given word list and return the result
     as a dictionary, where the key is the word type and the value is the length.
     """
-    len_dict = {awd: len(awd) for awd in tqdm(awlist) if len(awd) > greater_than}
+    if mandatory_wordlist:
+        len_dict = {awd: len(awd) for awd in tqdm(awlist) if (len(awd) > greater_than) or (awd in mandatory_wordlist)}
+    else:
+        len_dict = {awd: len(awd) for awd in tqdm(awlist) if len(awd) > greater_than}
 
     return len_dict
 
@@ -285,7 +288,7 @@ def get_prioritised_list(tokenlist, get_topN=100, mandatory_wordlist=None, num_a
     log_and_print("Calculating occurrence counts.")
     counts_dict = get_token_counts(tokenlist)
     log_and_print("Calculating word lengths.")
-    len_dict = get_word_lengths(sorted([awd for awd in counts_dict if awd != "<UNK>"]), greater_than=4)
+    len_dict = get_word_lengths(sorted([awd for awd in counts_dict if awd != "<UNK>"]), greater_than=4, mandatory_wordlist=mandatory_wordlist)
     typeslist = sorted(list(len_dict.keys()))
 
     combined_list = sorted([(alen, awd, counts_dict[awd], alen + counts_dict[awd]) for awd, alen in len_dict.items()], key=lambda xx: xx[1])
@@ -351,6 +354,7 @@ def print_main_prompt(wordset_list, wordset_idx, num_word_sets):
     """
 
     print("\n=========================================================================================================")
+    print("    WORD SET PAGES")
     print("=========================================================================================================\n")
     print("Word set", wordset_idx, "of", num_word_sets,"\n")
     astr = "Which word do you wish to work on?\n"
@@ -412,6 +416,7 @@ def handle_wordtype(awd, inputtext, typeslist, counts_dict, num_alternatives=Non
 
         tg_words = inputtext.get_sentence_at(atgfn, interval_count)
         print("\n=========================================================================================================")
+        print("    CORRECTION CHOICES")
         print("=========================================================================================================\n")
         print("Occurence number {} of {}\n".format(occ_progress_count+1, num_occs))
         print("Found {}{}{} in {} in the sentence:\n".format(colorama.Fore.YELLOW, awd, colorama.Fore.WHITE, os.path.basename(atgfn)))
@@ -606,8 +611,8 @@ def main():
             response = input("Enter a word to search for: ")
             if response in typeslist:
                 awd = response
-                print("The word \"{}\" is found in the vocabulary.".format(awd))
-                input("Press Enter to continue.")
+                print("\nThe word \"{}\" is found in the vocabulary. [Occurence count:{:5}]".format(awd, counts_dict[awd]))
+                input("\nPress Enter to continue.")
 
             else:
                 matches = find_matches_faster(response, typeslist, num_alternatives=2, ratio_threshold=0.6)
