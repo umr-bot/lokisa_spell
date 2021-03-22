@@ -92,6 +92,10 @@ def apply_changes(log_dir):
     if log_strings == []: return -1
     altered_textgrid_fn = 'altered_'+log_dir
     print(altered_textgrid_fn) 
+    
+    if not os.path.exists('changed_log_files'):
+        os.makedirs('changed_log_files')
+    
     for log_string in log_strings:
         search_word, textgrid_dir, interval, correction = decode_log_string(log_string)
         with open(textgrid_dir, encoding='utf-16') as f:
